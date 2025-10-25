@@ -1,4 +1,5 @@
 import express from "express";
+import cors from 'cors';
 import fs from "fs";
 import path from "path";
 import pdfParse from "pdf-parse";
@@ -15,6 +16,7 @@ import { candidateArticlesPool, addCandidates, initializeSemanticClusters, gener
 import 'dotenv/config';
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 const CACHE_DIR = "./cache";
@@ -103,5 +105,8 @@ setInterval(async () => {
 }, CLUSTER_REFRESH_INTERVAL);
 
 // Start server
-const PORT = process.env.PORT||3000;
-app.listen(PORT,()=>console.log(`OA MCP server with AI running on port ${PORT}`));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
