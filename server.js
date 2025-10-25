@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import pdfParse from "pdf-parse";
 import fetch from "node-fetch";
-import ai from "ai";
+import { AI } from "ai";
 import { kmeans } from "ml-kmeans";
 
 import { searchOpenAlex } from "./adapters/openalex.js";
@@ -13,9 +13,6 @@ import { analyzeArticlesAndReferences } from "./modules/analyze.js";
 
 import 'dotenv/config';
 
-const ai = new ai({ apiKey: process.env.ai_API_KEY });
-const UNPAYWALL_EMAIL = process.env.UNPAYWALL_EMAIL;
-
 const app = express();
 app.use(express.json());
 
@@ -24,7 +21,7 @@ const PDF_DIR = "./pdfs";
 if(!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
 if(!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR);
 
-const ai = new ai({ apiKey: process.env.ai_API_KEY });
+const ai = new AI({ apiKey: process.env.ai_API_KEY });
 const UNPAYWALL_EMAIL = process.env.UNPAYWALL_EMAIL || "YOUR_EMAIL@example.com";
 
 // Candidate pool for semantic search and clustering
@@ -34,8 +31,6 @@ let candidateArticlesPool = [];
 // -----------------------------------
 // OA Verification Helper
 // -----------------------------------
-import { saveCache, loadCache } from "./cache.js";
-
 async function checkOA(doi){
   const cacheKey = doi.replace(/\//g,"_");
   const cached = loadCache(cacheKey);
@@ -55,8 +50,6 @@ async function checkOA(doi){
 // -----------------------------------
 // Semantic AI-based Related Articles
 // -----------------------------------
-import { saveCache, loadCache } from "./cache.js";
-
 async function generateRelatedArticles(pdfText, doi) {
   const cacheKey = "embedding_" + doi.replace(/\//g, "_");
   let mainVector = loadCache(cacheKey);
@@ -172,24 +165,6 @@ async function initializeSemanticClusters() {
 
   console.log(`✓ Created ${numClusters} semantic clusters`);
 }
-
-  // Verify OA for top 5
-  const topCandidates = [];
-  for(const art of scored.slice(0,10)){
-    const oaInfo = await checkOA(art.doi);
-    if(oaInfo && oaInfo.is_oa && oaInfo.best_oa_location?.url_for_pdf){
-      topCandidates.push({
-        title: art.title,
-        doi: art.doi,
-        source: art.source||"OA Source",
-        pdf_url: oaInfo.best_oa_location.url_for_pdf
-      });
-    }
-  }
-
-  return topCandidates;
-}
-
 
 // -----------------------------------
 // MCP endpoints
