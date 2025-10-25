@@ -1,12 +1,22 @@
-project:
-  name: oa-mcp-server
-  runtime: typescript  # Smithery uses "typescript" for Node.js/JS projects
-  version: 1.0.0
-
-build:
-  install:
-    - npm install
+runtime: typescript
 
 startCommand:
-  command: node server.js
-  args: []
+  type: http
+  commandFunction: "node dist/server.js"
+  configSchema:
+    type: object
+    required:
+      - OPENAI_API_KEY
+      - UNPAYWALL_EMAIL
+    properties:
+      OPENAI_API_KEY:
+        type: string
+        title: "OpenAI API Key"
+        description: "Your OpenAI API key"
+      UNPAYWALL_EMAIL:
+        type: string
+        title: "Unpaywall Email"
+        description: "Your Unpaywall email address"
+  exampleConfig:
+    OPENAI_API_KEY: "your_openai_api_key"
+    UNPAYWALL_EMAIL: "your_email@example.com"
