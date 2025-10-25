@@ -1,0 +1,249 @@
+    1  curly=  0  paren=  0  import express from "express";
+    2  curly=  0  paren=  0  import fs from "fs";
+    3  curly=  0  paren=  0  import path from "path";
+    4  curly=  0  paren=  0  import pdfParse from "pdf-parse";
+    5  curly=  0  paren=  0  import fetch from "node-fetch";
+    6  curly=  0  paren=  0  import { AI } from "ai";
+    7  curly=  0  paren=  0  import { kmeans } from "ml-kmeans";
+    8  curly=  0  paren=  0  
+    9  curly=  0  paren=  0  import { searchOpenAlex } from "./adapters/openalex.js";
+   10  curly=  0  paren=  0  import { searchDOAJ } from "./adapters/doaj.js";
+   11  curly=  0  paren=  0  import { saveCache, loadCache } from "./cache.js";
+   12  curly=  0  paren=  0  import { analyzeArticlesAndReferences } from "./modules/analyze.js";
+   13  curly=  0  paren=  0  
+   14  curly=  0  paren=  0  import 'dotenv/config';
+   15  curly=  0  paren=  0  
+   16  curly=  0  paren=  0  const app = express();
+   17  curly=  0  paren=  0  app.use(express.json());
+   18  curly=  0  paren=  0  
+   19  curly=  0  paren=  0  const CACHE_DIR = "./cache";
+   20  curly=  0  paren=  0  const PDF_DIR = "./pdfs";
+   21  curly=  0  paren=  0  if(!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
+   22  curly=  0  paren=  0  if(!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR);
+   23  curly=  0  paren=  0  
+   24  curly=  0  paren=  0  const ai = new AI({ apiKey: process.env.ai_API_KEY });
+   25  curly=  0  paren=  0  const UNPAYWALL_EMAIL = process.env.UNPAYWALL_EMAIL || "YOUR_EMAIL@example.com";
+   26  curly=  0  paren=  0  
+   27  curly=  0  paren=  0  // Candidate pool for semantic search and clustering
+   28  curly=  0  paren=  0  let candidateArticlesPool = [];
+   29  curly=  0  paren=  0  
+   30  curly=  0  paren=  0  
+   31  curly=  0  paren=  0  // -----------------------------------
+   32  curly=  0  paren=  0  // OA Verification Helper
+   33  curly=  0  paren=  0  // -----------------------------------
+   34  curly=  1  paren=  0  async function checkOA(doi){
+   35  curly=  1  paren=  0    const cacheKey = doi.replace(/\//g,"_");
+   36  curly=  1  paren=  0    const cached = loadCache(cacheKey);
+   37  curly=  1  paren=  0    if(cached) return cached;
+   38  curly=  1  paren=  0  
+   39  curly=  1  paren=  0    const apiUrl = `https://api.unpaywall.org/v2/${encodeURIComponent(doi)}?email=${UNPAYWALL_EMAIL}`;
+   40  curly=  2  paren=  0    try{
+   41  curly=  2  paren=  0      const resp = await fetch(apiUrl);
+   42  curly=  2  paren=  0      if(!resp.ok) return null;
+   43  curly=  2  paren=  0      const data = await resp.json();
+   44  curly=  2  paren=  0      saveCache(cacheKey,data);
+   45  curly=  2  paren=  0      return data;
+   46  curly=  1  paren=  0    }catch{return null;}
+   47  curly=  0  paren=  0  }
+   48  curly=  0  paren=  0  
+   49  curly=  0  paren=  0  
+   50  curly=  0  paren=  0  // -----------------------------------
+   51  curly=  0  paren=  0  // Semantic AI-based Related Articles
+   52  curly=  0  paren=  0  // -----------------------------------
+   53  curly=  1  paren=  0  async function generateRelatedArticles(pdfText, doi) {
+   54  curly=  1  paren=  0    const cacheKey = "embedding_" + doi.replace(/\//g, "_");
+   55  curly=  1  paren=  0    let mainVector = loadCache(cacheKey);
+   56  curly=  1  paren=  0  
+   57  curly=  2  paren=  0    if (!mainVector) {
+   58  curly=  3  paren=  1      const embResp = await ai.embeddings.create({
+   59  curly=  3  paren=  1        model: "text-embedding-3-large",
+   60  curly=  3  paren=  1        input: pdfText
+   61  curly=  2  paren=  0      });
+   62  curly=  2  paren=  0      mainVector = embResp.data[0].embedding;
+   63  curly=  2  paren=  0      saveCache(cacheKey, mainVector);
+   64  curly=  1  paren=  0    }
+   65  curly=  1  paren=  0  
+   66  curly=  2  paren=  0    function cosineSim(a, b) {
+   67  curly=  2  paren=  0      const dot = a.reduce((sum, v, i) => sum + v * b[i], 0);
+   68  curly=  2  paren=  0      const magA = Math.sqrt(a.reduce((sum, v) => sum + v * v, 0));
+   69  curly=  2  paren=  0      const magB = Math.sqrt(b.reduce((sum, v) => sum + b * b[i], 0));
+   70  curly=  2  paren=  0      return dot / (magA * magB);
+   71  curly=  1  paren=  0    }
+   72  curly=  1  paren=  0  
+   73  curly=  1  paren=  0    // Find the cluster whose centroid is closest to this paper
+   74  curly=  1  paren=  0    let closestCluster = null;
+   75  curly=  1  paren=  0    let highestSim = -Infinity;
+   76  curly=  1  paren=  0  
+   77  curly=  2  paren=  0    for (let i = 0; i < topicCentroids.length; i++) {
+   78  curly=  2  paren=  0      const sim = cosineSim(mainVector, topicCentroids[i]);
+   79  curly=  3  paren=  0      if (sim > highestSim) {
+   80  curly=  3  paren=  0        highestSim = sim;
+   81  curly=  3  paren=  0        closestCluster = i;
+   82  curly=  2  paren=  0      }
+   83  curly=  1  paren=  0    }
+   84  curly=  1  paren=  0  
+   85  curly=  1  paren=  0    // Prefer articles in the same cluster
+   86  curly=  1  paren=  0    const clusterMembers = topicClusters
+   87  curly=  1  paren=  0      .filter(c => c.cluster === closestCluster && c.article.doi !== doi)
+   88  curly=  1  paren=  0      .map(c => c.article);
+   89  curly=  1  paren=  0  
+   90  curly=  1  paren=  0    // Fall back to all candidates if cluster is empty
+   91  curly=  1  paren=  0    const searchPool = clusterMembers.length > 0 ? clusterMembers : candidateArticlesPool;
+   92  curly=  1  paren=  0  
+   93  curly=  1  paren=  0    const scored = [];
+   94  curly=  2  paren=  0    for (const art of searchPool) {
+   95  curly=  2  paren=  0      if (!art.abstract) continue;
+   96  curly=  2  paren=  0  
+   97  curly=  2  paren=  0      let artEmbedding = loadCache("embedding_" + art.doi.replace(/\//g, "_"));
+   98  curly=  3  paren=  0      if (!artEmbedding) {
+   99  curly=  4  paren=  1        const embResp = await ai.embeddings.create({
+  100  curly=  4  paren=  1          model: "text-embedding-3-large",
+  101  curly=  4  paren=  1          input: art.abstract
+  102  curly=  3  paren=  0        });
+  103  curly=  3  paren=  0        artEmbedding = embResp.data[0].embedding;
+  104  curly=  3  paren=  0        saveCache("embedding_" + art.doi.replace(/\//g, "_"), artEmbedding);
+  105  curly=  2  paren=  0      }
+  106  curly=  2  paren=  0  
+  107  curly=  2  paren=  0      scored.push({ ...art, score: cosineSim(mainVector, artEmbedding) });
+  108  curly=  1  paren=  0    }
+  109  curly=  1  paren=  0  
+  110  curly=  1  paren=  0    scored.sort((a, b) => b.score - a.score);
+  111  curly=  1  paren=  0  
+  112  curly=  1  paren=  0    // Verify OA for top 5–10
+  113  curly=  1  paren=  0    const topCandidates = [];
+  114  curly=  2  paren=  0    for (const art of scored.slice(0, 10)) {
+  115  curly=  2  paren=  0      const oaInfo = await checkOA(art.doi);
+  116  curly=  3  paren=  0      if (oaInfo && oaInfo.is_oa && oaInfo.best_oa_location?.url_for_pdf) {
+  117  curly=  4  paren=  1        topCandidates.push({
+  118  curly=  4  paren=  1          title: art.title,
+  119  curly=  4  paren=  1          doi: art.doi,
+  120  curly=  4  paren=  1          source: art.source || "OA Source",
+  121  curly=  4  paren=  1          pdf_url: oaInfo.best_oa_location.url_for_pdf
+  122  curly=  3  paren=  0        });
+  123  curly=  2  paren=  0      }
+  124  curly=  1  paren=  0    }
+  125  curly=  1  paren=  0  
+  126  curly=  1  paren=  0    return topCandidates;
+  127  curly=  0  paren=  0  }
+  128  curly=  0  paren=  0  
+  129  curly=  0  paren=  0  // -----------------------------------
+  130  curly=  0  paren=  0  // Semantic Topic Clustering
+  131  curly=  0  paren=  0  // -----------------------------------
+  132  curly=  0  paren=  0  let topicClusters = [];
+  133  curly=  0  paren=  0  let topicCentroids = [];
+  134  curly=  0  paren=  0  
+  135  curly=  1  paren=  0  async function initializeSemanticClusters() {
+  136  curly=  2  paren=  0    if (candidateArticlesPool.length < 5) {
+  137  curly=  2  paren=  0      console.log("Skipping clustering — too few candidates.");
+  138  curly=  2  paren=  0      return;
+  139  curly=  1  paren=  0    }
+  140  curly=  1  paren=  0  
+  141  curly=  1  paren=  0    console.log("Building semantic clusters...");
+  142  curly=  1  paren=  0  
+  143  curly=  1  paren=  0    const embeddings = [];
+  144  curly=  2  paren=  0    for (const art of candidateArticlesPool) {
+  145  curly=  2  paren=  0      let artEmbedding = loadCache("embedding_" + art.doi.replace(/\//g, "_"));
+  146  curly=  3  paren=  0      if (!artEmbedding) {
+  147  curly=  4  paren=  1        const embResp = await ai.embeddings.create({
+  148  curly=  4  paren=  1          model: "text-embedding-3-large",
+  149  curly=  4  paren=  1          input: art.abstract || art.title
+  150  curly=  3  paren=  0        });
+  151  curly=  3  paren=  0        artEmbedding = embResp.data[0].embedding;
+  152  curly=  3  paren=  0        saveCache("embedding_" + art.doi.replace(/\//g, "_"), artEmbedding);
+  153  curly=  2  paren=  0      }
+  154  curly=  2  paren=  0      embeddings.push(artEmbedding);
+  155  curly=  1  paren=  0    }
+  156  curly=  1  paren=  0  
+  157  curly=  1  paren=  0    const numClusters = Math.min(5, Math.floor(Math.sqrt(candidateArticlesPool.length / 2))); // adaptive
+  158  curly=  1  paren=  0    const kmeansResult = kmeans(embeddings, numClusters);
+  159  curly=  1  paren=  0  
+  160  curly=  2  paren=  2    topicClusters = kmeansResult.clusters.map((clusterIdx, i) => ({
+  161  curly=  2  paren=  2      cluster: clusterIdx,
+  162  curly=  2  paren=  2      article: candidateArticlesPool[i]
+  163  curly=  1  paren=  0    }));
+  164  curly=  1  paren=  0    topicCentroids = kmeansResult.centroids;
+  165  curly=  1  paren=  0  
+  166  curly=  1  paren=  0    console.log(`✓ Created ${numClusters} semantic clusters`);
+  167  curly=  0  paren=  0  }
+  168  curly=  0  paren=  0  
+  169  curly=  0  paren=  0  // -----------------------------------
+  170  curly=  0  paren=  0  // MCP endpoints
+  171  curly=  0  paren=  0  // -----------------------------------
+  172  curly=  1  paren=  1  app.get("/.well-known/mcp.json",(req,res)=>{
+  173  curly=  2  paren=  2    res.json({
+  174  curly=  2  paren=  2      name:"OA Verified Discovery MCP",
+  175  curly=  2  paren=  2      description:"Search OA articles, serve PDFs, analyze references, suggest related OA articles",
+  176  curly=  2  paren=  2      version:"1.2.0",
+  177  curly=  2  paren=  2      endpoints:[
+  178  curly=  3  paren=  2        {
+  179  curly=  3  paren=  2          name:"search_oa",
+  180  curly=  3  paren=  2          description:"Search OA content with PDF retrieval and AI analysis",
+  181  curly=  3  paren=  2          input_schema:"/schemas/search_oa.json",
+  182  curly=  3  paren=  2          output_schema:"/schemas/search_oa.json"
+  183  curly=  2  paren=  2        }
+  184  curly=  2  paren=  2      ]
+  185  curly=  1  paren=  1    });
+  186  curly=  0  paren=  0  });
+  187  curly=  0  paren=  0  
+  188  curly=  1  paren=  1  app.post("/search_oa", async (req,res)=>{
+  189  curly=  1  paren=  1    const { query, type="all", year_from, year_to, max_results=20 } = req.body;
+  190  curly=  1  paren=  1    if(!query) return res.status(400).json({error:"Missing query"});
+  191  curly=  1  paren=  1  
+  192  curly=  1  paren=  1    // -----------------------------
+  193  curly=  1  paren=  1    // Step 1 & 2: Search and fetch PDFs
+  194  curly=  1  paren=  1    // -----------------------------
+  195  curly=  1  paren=  1    let results = [];
+  196  curly=  1  paren=  2    const [oa1, oa2] = await Promise.all([
+  197  curly=  1  paren=  2      searchOpenAlex(query,type,year_from,year_to,PDF_DIR),
+  198  curly=  1  paren=  2      searchDOAJ(query,type,year_from,year_to,PDF_DIR)
+  199  curly=  1  paren=  1    ]);
+  200  curly=  1  paren=  1    results.push(...oa1,...oa2);
+  201  curly=  1  paren=  1  
+  202  curly=  1  paren=  1    // Update candidate pool for semantic AI
+  203  curly=  1  paren=  1    candidateArticlesPool.push(...results);
+  204  curly=  1  paren=  1    
+  205  curly=  1  paren=  1    await initializeSemanticClusters();
+  206  curly=  1  paren=  1  
+  207  curly=  1  paren=  1    // Deduplicate
+  208  curly=  2  paren=  3    const deduped = Object.values(results.reduce((acc,r)=>{
+  209  curly=  2  paren=  3      const key = r.doi.toLowerCase();
+  210  curly=  2  paren=  3      if(!acc[key]) acc[key]=r;
+  211  curly=  2  paren=  3      return acc;
+  212  curly=  1  paren=  1    },{})).slice(0,max_results);
+  213  curly=  1  paren=  1  
+  214  curly=  1  paren=  1  // Step 3: AI analysis and reference verification
+  215  curly=  1  paren=  1  const analyzed = await analyzeArticlesAndReferences(deduped);
+  216  curly=  1  paren=  1  
+  217  curly=  1  paren=  1  // Step 4: AI-suggested related articles
+  218  curly=  1  paren=  1  res.json({ results: analyzed });
+  219  curly=  1  paren=  1  
+  220  curly=  1  paren=  1  // Serve PDFs directly
+  221  curly=  2  paren=  2  app.get("/article/:doi/pdf",(req,res)=>{
+  222  curly=  2  paren=  2    const doi = req.params.doi.replace(/\//g,"_");
+  223  curly=  2  paren=  2    const filePath = path.join(PDF_DIR, `${doi}.pdf`);
+  224  curly=  2  paren=  2    if(!fs.existsSync(filePath)) return res.status(404).send("PDF not found");
+  225  curly=  2  paren=  2    res.sendFile(path.resolve(filePath));
+  226  curly=  1  paren=  1  });
+  227  curly=  1  paren=  1  
+  228  curly=  1  paren=  1  // -----------------------------------
+  229  curly=  1  paren=  1  // 🕒 Optional: Background cluster refresh
+  230  curly=  1  paren=  1  // -----------------------------------
+  231  curly=  1  paren=  1  const CLUSTER_REFRESH_INTERVAL = 30 * 60 * 1000; // every 30 minutes
+  232  curly=  1  paren=  1  
+  233  curly=  2  paren=  2  setInterval(async () => {
+  234  curly=  3  paren=  2    if (candidateArticlesPool.length > 0) {
+  235  curly=  3  paren=  2      console.log("⏳ Recomputing semantic clusters in background...");
+  236  curly=  4  paren=  2      try {
+  237  curly=  4  paren=  2        await initializeSemanticClusters();
+  238  curly=  4  paren=  2        console.log("✅ Clusters refreshed successfully");
+  239  curly=  4  paren=  2      } catch (err) {
+  240  curly=  4  paren=  2        console.error("❌ Error refreshing clusters:", err.message);
+  241  curly=  3  paren=  2      }
+  242  curly=  2  paren=  2    }
+  243  curly=  1  paren=  1  }, CLUSTER_REFRESH_INTERVAL);
+  244  curly=  1  paren=  1  
+  245  curly=  1  paren=  1  // Start server
+  246  curly=  1  paren=  1  const PORT = process.env.PORT||3000;
+  247  curly=  1  paren=  1  app.listen(PORT,()=>console.log(`OA MCP server with AI running on port ${PORT}`));
+FINAL: unbalanced curly count: 1
+FINAL: unbalanced paren count: 1
