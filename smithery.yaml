@@ -1,0 +1,12 @@
+project:
+  name: oa-mcp-server
+  type: nodejs
+  entry: server.js
+  version: 1.0.0
+
+build:
+  install:
+    - npm install
+
+run:
+  start: node server.js
