@@ -1,12 +1,12 @@
 project:
   name: oa-mcp-server
-  type: nodejs
-  entry: server.js
+  runtime: typescript  # Smithery uses "typescript" for Node.js/JS projects
   version: 1.0.0
 
 build:
   install:
     - npm install
 
-run:
-  start: node server.js
+startCommand:
+  command: node server.js
+  args: []
