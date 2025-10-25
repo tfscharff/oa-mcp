@@ -1,7 +1,7 @@
 import fetch from "node-fetch";
 import fs from "fs";
 import path from "path";
-import { checkOA } from "../server.js";
+import { checkOA, generateRelatedArticles } from "../modules/oa_helpers.js";
 
 /**
  * Search DOAJ for OA articles

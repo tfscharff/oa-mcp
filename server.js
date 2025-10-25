@@ -10,6 +10,8 @@ import { searchOpenAlex } from "./adapters/openalex.js";
 import { searchDOAJ } from "./adapters/doaj.js";
 import { saveCache, loadCache } from "./cache.js";
 import { analyzeArticlesAndReferences } from "./modules/analyze.js";
+import { candidateArticlesPool, addCandidates, initializeSemanticClusters, generateRelatedArticles, checkOA } from "./modules/oa_helpers.js";
+
 
 import 'dotenv/config';
 
@@ -200,9 +202,9 @@ app.post("/search_oa", async (req,res)=>{
   results.push(...oa1,...oa2);
 
   // Update candidate pool for semantic AI
-  candidateArticlesPool.push(...results);
-  
+  addCandidates(results);
   await initializeSemanticClusters();
+
 
   // Deduplicate
   const deduped = Object.values(results.reduce((acc,r)=>{

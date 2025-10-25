@@ -2,8 +2,7 @@
 import fs from "fs";
 import path from "path";
 import pdfParse from "pdf-parse";
-import { checkOA } from "../server.js"; // or export it properly
-import { generateRelatedArticles } from "../server.js";
+import { checkOA, generateRelatedArticles } from "../modules/oa_helpers.js";
 
 const PDF_DIR = "./pdfs";
 

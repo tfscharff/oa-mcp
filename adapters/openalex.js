@@ -1,7 +1,7 @@
 import fetch from "node-fetch";
 import fs from "fs";
 import path from "path";
-import { checkOA } from "../server.js"; // reuse OA verification helper
+import { checkOA, generateRelatedArticles } from "../modules/oa_helpers.js";
 
 /**
  * Search OpenAlex for OA articles
