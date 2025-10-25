@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import pdfParse from "pdf-parse";
 import fetch from "node-fetch";
-import OpenAI from "openai";
+import ai from "ai";
 import { kmeans } from "ml-kmeans";
 
 import { searchOpenAlex } from "./adapters/openalex.js";
@@ -13,7 +13,7 @@ import { analyzeArticlesAndReferences } from "./modules/analyze.js";
 
 import 'dotenv/config';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const ai = new ai({ apiKey: process.env.ai_API_KEY });
 const UNPAYWALL_EMAIL = process.env.UNPAYWALL_EMAIL;
 
 const app = express();
@@ -24,7 +24,7 @@ const PDF_DIR = "./pdfs";
 if(!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
 if(!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR);
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const ai = new ai({ apiKey: process.env.ai_API_KEY });
 const UNPAYWALL_EMAIL = process.env.UNPAYWALL_EMAIL || "YOUR_EMAIL@example.com";
 
 // Candidate pool for semantic search and clustering
@@ -62,7 +62,7 @@ async function generateRelatedArticles(pdfText, doi) {
   let mainVector = loadCache(cacheKey);
 
   if (!mainVector) {
-    const embResp = await openai.embeddings.create({
+    const embResp = await ai.embeddings.create({
       model: "text-embedding-3-large",
       input: pdfText
     });
@@ -103,7 +103,7 @@ async function generateRelatedArticles(pdfText, doi) {
 
     let artEmbedding = loadCache("embedding_" + art.doi.replace(/\//g, "_"));
     if (!artEmbedding) {
-      const embResp = await openai.embeddings.create({
+      const embResp = await ai.embeddings.create({
         model: "text-embedding-3-large",
         input: art.abstract
       });
@@ -151,7 +151,7 @@ async function initializeSemanticClusters() {
   for (const art of candidateArticlesPool) {
     let artEmbedding = loadCache("embedding_" + art.doi.replace(/\//g, "_"));
     if (!artEmbedding) {
-      const embResp = await openai.embeddings.create({
+      const embResp = await ai.embeddings.create({
         model: "text-embedding-3-large",
         input: art.abstract || art.title
       });
