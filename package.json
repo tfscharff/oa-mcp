@@ -1,6 +1,7 @@
 {
   "name": "oa-mcp-server",
   "version": "1.0.0",
+  "type": "module"
   "main": "server.js",
   "module": "server.js",
   "scripts": {

@@ -2,10 +2,15 @@ import express from "express";
 import cors from "cors";
 import fs from "fs";
 import path from "path";
-import pdfParse from "pdf-parse";
 import fetch from "node-fetch";
 import OpenAI from "openai";
-import { kmeans } from "ml-kmeans";
+
+import pkg from "ml-kmeans";
+const { kmeans } = pkg;
+
+import pdfParsePkg from "pdf-parse";
+const pdfParse = pdfParsePkg;
+
 
 import { searchOpenAlex } from "./adapters/openalex.js";
 import { searchDOAJ } from "./adapters/doaj.js";
