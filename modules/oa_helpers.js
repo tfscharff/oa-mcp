@@ -1,8 +1,10 @@
 // modules/oa_helpers.js
 import fetch from "node-fetch";
-import { kmeans } from "ml-kmeans";
 import OpenAI from "openai";
 import { saveCache, loadCache } from "../cache.js";
+
+import pkg from "ml-kmeans";
+const { kmeans } = pkg;
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const UNPAYWALL_EMAIL = process.env.UNPAYWALL_EMAIL || "YOUR_EMAIL@example.com";
