@@ -216,6 +216,7 @@ const analyzed = await analyzeArticlesAndReferences(deduped);
 
 // Step 4: AI-suggested related articles
 res.json({ results: analyzed });
+});
 
 // Serve PDFs directly
 app.get("/article/:doi/pdf",(req,res)=>{
